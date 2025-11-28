@@ -4,7 +4,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, relationship
 
-Base = declarative_base()
+from core.database import Base
+
 
 class User(Base):
     __tablename__ = "users"
