@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 from datetime import datetime
 
-revision = '2025_add_chat_system'
+revision = '2025_add_chat_systems'
 down_revision = None
 branch_labels = None
 depends_on = None

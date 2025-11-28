@@ -15,7 +15,6 @@ depends_on = None
 
 
 def upgrade():
-    # Chats
     op.add_column('chats', sa.Column('announcement_id', sa.BigInteger(), nullable=False))
     op.add_column('chats', sa.Column('buyer_id', sa.BigInteger(), nullable=False))
     op.add_column('chats', sa.Column('last_message_text', sa.String(255), nullable=True))
@@ -31,7 +30,6 @@ def upgrade():
     op.create_index('ix_chats_announcement_buyer', 'chats', ['announcement_id', 'buyer_id'])
     op.create_index('ix_chats_last_message_at', 'chats', ['last_message_at'])
 
-    # Messages
     op.add_column('messages', sa.Column('message_type', sa.String(20), server_default='text', nullable=False))
     op.add_column('messages', sa.Column('file_url', sa.String(500), nullable=True))
     op.add_column('messages', sa.Column('is_read', sa.Boolean(), server_default='false', nullable=False))

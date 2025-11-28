@@ -25,6 +25,7 @@ def upgrade():
     op.execute("""COMMENT ON COLUMN users.temp_user_relations IS
         'relationships: sent_messages = relationship("Message", back_populates="sender"), buyer_chats = relationship("Chat", back_populates="buyer")'""")
     op.drop_column('users', 'temp_user_relations')
+    
 
 
 def downgrade():

@@ -6,18 +6,14 @@ from sqlalchemy.orm import declarative_base
 
 from dotenv import load_dotenv
 
-
-Base = declarative_base()
 load_dotenv()
 
-POSTGRES_USER = os.getenv('POSTGRES_USER')
-POSTGRES_PASSWORD = os.getenv('POSTGRES_PASSWORD')
-if not POSTGRES_PASSWORD:
-    logging.error("POSTGRES_PASSWORD not found in .env")
-if not POSTGRES_USER:
-    logging.error("POSTGRES_USER not found in .env")
+Base = declarative_base()
 
-DATABASE_URL = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@0.0.0.0:5432/mytrade"
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    logging.error("DATABASE_URL not found in .env")
 
 engine = create_async_engine(
     DATABASE_URL,
