@@ -2,7 +2,7 @@ from sqlalchemy import (
     Column, BigInteger, Integer, String, Numeric, SmallInteger,
     TIMESTAMP, ForeignKey
 )
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import relationship
 
 from core.database import Base
 
@@ -67,3 +67,5 @@ class User(Base):
     tcompany_name_tr = Column(BigInteger, ForeignKey("mytrade.translations.id"))
 
     meta_status = Column(SmallInteger, nullable=False, default=0)
+
+    sent_messages = relationship("Message", back_populates="sender")

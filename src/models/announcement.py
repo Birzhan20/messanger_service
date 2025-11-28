@@ -86,3 +86,4 @@ class Announcement(Base):
     published_time = Column(Time)
     unpublish_time = Column(Time)
 
+    chats = relationship("Chat", back_populates="ad")
