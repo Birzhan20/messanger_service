@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Column, ForeignKey, String, Text, Boolean, DateTime
+from sqlalchemy import BigInteger, Column, ForeignKey, String, Text, Boolean, DateTime, Integer
 from sqlalchemy.orm import relationship
 
 from core.database import Base
@@ -9,7 +9,7 @@ from core.database import Base
 class Message(Base):
     __tablename__ = 'messages'
 
-    id = Column(BigInteger, primary_key=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     chat_id = Column(BigInteger, ForeignKey('chats.id'), nullable=False)
     sender_id = Column(BigInteger, ForeignKey('users.id'), nullable=False)
     message_text = Column(Text, nullable=True)

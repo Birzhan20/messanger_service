@@ -10,7 +10,7 @@ from core.database import Base
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     user_role_id = Column(BigInteger, nullable=False, default=3)
 
     name = Column(String(255), nullable=False)
@@ -69,3 +69,17 @@ class User(Base):
     meta_status = Column(SmallInteger, nullable=False, default=0)
 
     sent_messages = relationship("Message", back_populates="sender")
+
+    # Чаты, где пользователь — ПОКУПАТЕЛЬ
+    buyer_chats = relationship(
+        "Chat",
+        back_populates="buyer",
+        foreign_keys="Chat.buyer_id"  # ← ЯВНО указываем колонку!
+    )
+
+    # Чаты, где пользователь — ПРОДАВЕЦ
+    seller_chats = relationship(
+        "Chat",
+        back_populates="seller",
+        foreign_keys="Chat.seller_id"  # ← ЯВНО указываем колонку!
+    )
