@@ -25,8 +25,8 @@ propcache==0.4.1
 pydantic==2.12.5
 pydantic_core==2.41.5
 python-dateutil==2.9.0.post0
+python-docx==1.2.0
 python-dotenv==1.2.1
-1.2.0
 python-multipart==0.0.20
 s3transfer==0.14.0
 six==1.17.0
