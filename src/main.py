@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from api.v1.chat import router as chat_router
-from api.v1.chat import router as support_router
+from api.v1.support import router as support_router
 
 app = FastAPI(title="Messenger service")
 

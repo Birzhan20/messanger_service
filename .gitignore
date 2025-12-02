@@ -1,2 +1,3 @@
 dump2.sql
 .env
+.migratiion.py

@@ -22,7 +22,7 @@ services:
         depends_on:
             - postgres
         env_file:
-            - .env
+            - src/.env
         environment:
             DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/messenger_db
         volumes:

@@ -7,17 +7,16 @@ from schemas.support import (
 from services.grok import call_grok_model
 from prompts import read_prompt, write_prompt
 
-router = APIRouter(prefix="/support", tags=["Support"])
-
+router = APIRouter(prefix="/support", tags=["Support"])  
 
 @router.post("/chat", response_model=ChatResponse)
 async def support_chat(req: ChatRequest):
-    try:
-        base_prompt = read_prompt()
-    except Exception as e:
-        raise HTTPException(500, f"Prompt read error: {e}")
+    # try:
+    #     base_prompt = read_prompt()
+    # except Exception as e:
+    #     raise HTTPException(500, f"Prompt read error: {e}")
 
-    full_msg = (base_prompt + "\n\n" if base_prompt.strip() else "") + req.message
+    full_msg = req.message
 
     try:
         model_resp = await call_grok_model(
@@ -26,7 +25,7 @@ async def support_chat(req: ChatRequest):
             conv_id=req.conv_id
         )
     except Exception as e:
-        raise HTTPException(500, f"Grok model error: {e}")
+        raise HTTPException(500, f"Grok modle error : {e}")
 
     reply = (
         model_resp.get("reply")
@@ -34,7 +33,6 @@ async def support_chat(req: ChatRequest):
         or model_resp.get("message")
         or str(model_resp)
     )
-
     return ChatResponse(reply=reply, raw=model_resp)
 
 
@@ -43,7 +41,7 @@ async def update_prompt(req: UpdatePromptRequest):
     try:
         write_prompt(req.content)
     except Exception as e:
-        raise HTTPException(500, f"Prompt write error: {e}")
+        raise HTTPException(500, f"Prompt error: {e}")
 
 
 @router.get("/prompt")
