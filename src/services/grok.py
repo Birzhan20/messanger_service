@@ -28,7 +28,7 @@ async def call_grok_model(
     messages_payload.append({"role": "user", "content": message})
 
     payload = {
-        "model": "grok-4-fast-reasoning",
+        "model": "grok-4-fast-non-reasoning",
         "stream": False,
         "messages": messages_payload
     }
