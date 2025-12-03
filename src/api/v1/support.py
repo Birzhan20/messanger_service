@@ -1,31 +1,58 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, File, UploadFile, Depends
 from schemas.support import (
     ChatRequest,
     ChatResponse,
-    UpdatePromptRequest
+    UpdatePromptRequest,
+    SupportMessageOut
 )
 from services.grok import call_grok_model
-from prompts import read_prompt, write_prompt
+from prompts import read_prompt, write_prompt, upload_prompt
+from pathlib import Path
+from core.config import settings
+from crud.support import (
+    get_or_create_room,
+    get_last_messages,
+    save_message
+)
+from core.database import get_db
+from models.support import SenderType
+from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter(prefix="/support", tags=["Support"])  
+
+router = APIRouter(prefix="/support", tags=["Support"])
+
+
+@router.get("/chat/{user_id}", response_model=list[SupportMessageOut])
+async def get_support_messages(user_id: int, db: AsyncSession = Depends(get_db)):
+    room = await get_or_create_room(user_id, db)
+    messages = await get_last_messages(room.id, db)
+    return messages
+
 
 @router.post("/chat", response_model=ChatResponse)
-async def support_chat(req: ChatRequest):
-    # try:
-    #     base_prompt = read_prompt()
-    # except Exception as e:
-    #     raise HTTPException(500, f"Prompt read error: {e}")
+async def support_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
+    if not req.user_id:
+        raise HTTPException(400, "user_id is required")
 
-    full_msg = req.message
+    room = await get_or_create_room(req.user_id, db)
+
+    await save_message(
+        room_id=room.id,
+        sender=SenderType.user,
+        message=req.message,
+        db=db
+    )
+
+    history = await get_last_messages(room.id, db)
 
     try:
         model_resp = await call_grok_model(
-            full_msg,
+            message=req.message,
             user_id=req.user_id,
-            conv_id=req.conv_id
+            history=history
         )
     except Exception as e:
-        raise HTTPException(500, f"Grok modle error : {e}")
+        raise HTTPException(500, f"Grok model error: {e}")
 
     reply = (
         model_resp.get("reply")
@@ -33,6 +60,14 @@ async def support_chat(req: ChatRequest):
         or model_resp.get("message")
         or str(model_resp)
     )
+
+    await save_message(
+        room_id=room.id,
+        sender=SenderType.assistant,
+        message=reply,
+        db=db
+    )
+
     return ChatResponse(reply=reply, raw=model_resp)
 
 
@@ -51,3 +86,16 @@ async def get_prompt():
         return {"content": content}
     except Exception as e:
         raise HTTPException(500, f"Prompt read error: {e}")
+
+
+@router.post("/prompt/upload", status_code=status.HTTP_201_CREATED)
+async def upload_file_prompt(file: UploadFile = File(...)):
+    try:
+        temp_path = Path(settings.SUPPORT_PROMPT_PATH).parent / file.filename
+        content_bytes = await file.read()
+        temp_path.write_bytes(content_bytes)
+        content = upload_prompt(temp_path)
+    except Exception as e:
+        raise HTTPException(500, f"Prompt upload error: {e}")
+
+    return {"filename": file.filename, "status": "uploaded", "content_length": len(content)}

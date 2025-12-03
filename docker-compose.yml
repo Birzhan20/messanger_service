@@ -1,33 +1,41 @@
 version: "3.9"
 
 services:
-    postgres:
-        image: postgres:16
-        container_name: local-postgres
-        environment:
-            POSTGRES_DB: messenger_db
-            POSTGRES_USER: postgres
-            POSTGRES_PASSWORD: postgres
-        ports:
-            - "5432:5432"
-        volumes:
-            - pgdata:/var/lib/postgresql/data
+  postgres:
+    image: postgres:16
+    container_name: local-postgres
+    environment:
+      POSTGRES_DB: messenger_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
 
-    messenger:
-        build:
-            context: ./src
-        container_name: messenger-service
-        ports:
-            - "8000:8000"
-        depends_on:
-            - postgres
-        env_file:
-            - src/.env
-        environment:
-            DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/messenger_db
-        volumes:
-            - ./src:/app
-        command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+  redis:
+    image: redis:7
+    container_name: local-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  messenger:
+    build:
+      context: ./src
+    container_name: messenger-service
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    env_file:
+      - src/.env
+    volumes:
+      - ./src:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
-    pgdata:
+  pgdata:
+  redisdata:

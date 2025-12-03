@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
 
 from src.core.database import Base
+from src.models.support import Room, SupportChat
 target_metadata = Base.metadata
 
 # Alembic Config

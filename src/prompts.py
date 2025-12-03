@@ -1,23 +1,24 @@
 from pathlib import Path
 from core.config import settings
+from core.redis import get_redis
 
 try:
-    from docx import Document  # python-docx
+    from docx import Document
     DOCX_AVAILABLE = True
-except Exception:
+except ImportError:
     DOCX_AVAILABLE = False
 
 
 def _read_docx(path: Path) -> str:
     if not DOCX_AVAILABLE:
-        raise RuntimeError("python-docx not installed")
+        raise RuntimeError("python-docx не установлен")
     doc = Document(path)
     return "\n".join(p.text for p in doc.paragraphs)
 
 
 def _write_docx(path: Path, content: str):
     if not DOCX_AVAILABLE:
-        raise RuntimeError("python-docx not installed")
+        raise RuntimeError("python-docx не установлен")
     doc = Document()
     for line in content.splitlines():
         doc.add_paragraph(line)
@@ -25,16 +26,25 @@ def _write_docx(path: Path, content: str):
 
 
 def read_prompt() -> str:
+    redis = get_redis()
+    cached = redis.get("support_prompt")
+    if cached:
+        return cached
+
     path = Path(settings.SUPPORT_PROMPT_PATH)
 
     if not path.exists():
         path.write_text("", encoding="utf-8")
+        redis.set("support_prompt", "")
         return ""
 
     if path.suffix.lower() == ".docx":
-        return _read_docx(path)
+        content = _read_docx(path)
+    else:
+        content = path.read_text(encoding="utf-8")
 
-    return path.read_text(encoding="utf-8")
+    redis.set("support_prompt", content)
+    return content
 
 
 def write_prompt(content: str):
@@ -42,6 +52,23 @@ def write_prompt(content: str):
 
     if path.suffix.lower() == ".docx":
         _write_docx(path, content)
-        return
+    else:
+        path.write_text(content, encoding="utf-8")
 
-    path.write_text(content, encoding="utf-8")
+    redis = get_redis()
+    redis.set("support_prompt", content)
+
+
+def upload_prompt(file_path: Path):
+    if not file_path.exists():
+        raise FileNotFoundError(f"{file_path} не найден")
+
+    if file_path.suffix.lower() in (".txt", ".md"):
+        content = file_path.read_text(encoding="utf-8")
+    elif file_path.suffix.lower() == ".docx":
+        content = _read_docx(file_path)
+    else:
+        raise ValueError("Поддерживаются только .txt, .md, .docx")
+
+    write_prompt(content)
+    return content
