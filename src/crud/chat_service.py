@@ -4,10 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 from fastapi import HTTPException, status
 
-from src.models.chat import Chat
-from src.models.announcement import Announcement
-from src.models.messages import Message
-from src.models.user import User
+from models.chat import Chat
+from models.announcement import Announcement
+from models.messages import Message
+from models.user import User
 
 
 async def get_or_create_chat(announcement_id: int, buyer_id: int, db: AsyncSession):

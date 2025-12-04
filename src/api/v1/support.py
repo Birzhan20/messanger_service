@@ -1,13 +1,13 @@
 import logging
 from fastapi import APIRouter, HTTPException, status, File, UploadFile, Depends
-from src.schemas.support import ChatRequest, ChatResponse, UpdatePromptRequest, SupportMessageOut
-from src.services.grok import call_grok_model
-from src.prompts import read_prompt, write_prompt, upload_prompt
+from schemas.support import ChatRequest, ChatResponse, UpdatePromptRequest, SupportMessageOut
+from services.grok import call_grok_model
+from prompts import read_prompt, write_prompt, upload_prompt
 from pathlib import Path
-from src.core.config import settings
-from src.crud.support import get_or_create_room, get_last_messages, save_message
-from src.core.database import get_db
-from src.models.support import SenderType
+from core.config import settings
+from crud.support import get_or_create_room, get_last_messages, save_message
+from core.database import get_db
+from models.support import SenderType
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger("api.support")

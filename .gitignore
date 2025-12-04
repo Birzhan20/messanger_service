@@ -4,6 +4,7 @@ dump2.sql
 *.py[cod]
 *$py.class
 
+trash
 # Python cache
 __pycache__/
 *.pyc

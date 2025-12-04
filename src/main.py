@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from src.api.v1.chat import router as chat_router
-from src.api.v1.support import router as support_router
-import src.core.logger
+from api.v1.chat import router as chat_router
+from api.v1.support import router as support_router
+import core.logger
 import logging
 
 
@@ -15,4 +15,4 @@ logger.info("FastAPI app initialized")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("src.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

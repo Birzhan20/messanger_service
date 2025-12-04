@@ -1,3 +1,11 @@
+
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parent.parent / "src"))
+
+from core.database import Base
+from models.support import Room, SupportChat
 import os
 import asyncio
 from logging.config import fileConfig
@@ -6,8 +14,6 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
 
-from src.core.database import Base
-from src.models.support import Room, SupportChat
 target_metadata = Base.metadata
 
 # Alembic Config

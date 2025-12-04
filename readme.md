@@ -1,15 +1,23 @@
+1) Переместите dump2.sql в корневую директорию
+2) Создайте env файл с апи ключом
+3) Примените алембик миграций
+4) Запустите докер
+
+
 .env example
 ```
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_DB=messenger_db
-POSTGRES_HOST=posgres
+POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
 
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/messenger_db
+DATABASE_URL_LOCAL=postgresql+asyncpg://postgres:postgres@localhost:5432/messenger_db
+
 
 GROK_API_URL=https://api.x.ai/v1/chat/completions
-GROK_API_KEY="Your api key"
+GROK_API_KEY="Your GROK API key"
 SUPPORT_PROMPT_PATH=./prompts.docx
 REDIS_HOST=redis
 REDIS_PORT=6379

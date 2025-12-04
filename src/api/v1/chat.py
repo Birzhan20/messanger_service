@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.core.database import get_db
-from src.crud.chat_service import (
+from core.database import get_db
+from crud.chat_service import (
     get_or_create_chat, send_message, get_user_chats, get_chat_with_messages
 )
 

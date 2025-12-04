@@ -1,7 +1,7 @@
 import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from src.core.config import settings
+from core.config import settings
 
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
