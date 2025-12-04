@@ -1,7 +1,7 @@
 import enum
 from sqlalchemy import Column, Integer, String, Enum, ForeignKey, DateTime, func
 from sqlalchemy.orm import relationship
-from core.database import Base
+from src.core.database import Base
 
 
 class SenderType(enum.Enum):

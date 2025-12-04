@@ -4,7 +4,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, relationship
 
-from core.database import Base
+from src.core.database import Base
 
 
 class Announcement(Base):

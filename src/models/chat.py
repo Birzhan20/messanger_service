@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Column, BigInteger, DateTime, ForeignKey, String, Index
 from sqlalchemy.orm import relationship
 
-from core.database import Base
+from src.core.database import Base
 
 
 class Chat(Base):

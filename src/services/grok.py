@@ -1,8 +1,8 @@
 import logging
 import httpx
-from core.config import settings
-from prompts import read_prompt
-from models.support import SupportChat, SenderType
+from src.core.config import settings
+from src.prompts import read_prompt
+from src.models.support import SupportChat, SenderType
 
 logger = logging.getLogger("services.grok")
 
