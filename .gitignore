@@ -1,12 +1,16 @@
 dump2.sql
 .env
 # Byte-compiled / optimized / DLL files
-__pycache__/
 *.py[cod]
 *$py.class
 
+# Python cache
+__pycache__/
+*.pyc
+
 # C extensions
 *.so
+tests
 
 # Distribution / packaging
 .Python
