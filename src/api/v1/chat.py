@@ -6,8 +6,10 @@ from crud.chat_service import (
 )
 
 from core.s3 import upload_to_s3
+from core.pocketbase_client import PocketBaseClient
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
+pb_client = PocketBaseClient()
 
 
 @router.post("/start/{announcement_id}")
@@ -37,7 +39,8 @@ async def send(user_id: int, chat_id: int, text: str = None, file: UploadFile = 
 
     if file:
         file_bytes = await file.read()
-        file_url = await upload_to_s3(file_bytes, file.filename)
+        file_url = await pb_client.upload_file(file_bytes, file.filename)
+        # file_url = await upload_to_s3(file_bytes, file.filename)
         content_type = file.content_type or ""
         if content_type.startswith("image/"):
             message_type = "image"

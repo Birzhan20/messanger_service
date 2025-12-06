@@ -5,7 +5,7 @@ import core.config
 
 from src.crud import support as crud_support
 from src.services import grok as services_grok
-from src.prompts import read_prompt, write_prompt, upload_prompt
+from services.prompts import read_prompt, write_prompt, upload_prompt
 
 
 # CRUD unit tests

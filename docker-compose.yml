@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16
@@ -35,7 +33,33 @@ services:
     volumes:
       - ./src:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+  
+  minio:
+    image: minio/minio:latest
+    container_name: local-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: d0d2335ed8a56cca41024b56a59059f7555e8e4f0fdba0946798e26de37f1225
+      MINIO_ROOT_PASSWORD: d0d2335ed8a56cca41024b56a59059f7555e8e4f0fdba0946798e26de37f1225
+    command: server /data --console-address ":9001"
+    volumes:
+      - miniodata:/data
+
+  pocketbase:
+    image: adrianmusante/pocketbase:latest
+    container_name: pocketbase
+    ports:
+      - "8090:8090"
+    environment:
+      POCKETBASE_ADMIN_EMAIL: admin@mytrade.kz
+      POCKETBASE_ADMIN_PASSWORD: 78bc207223a5fc2df13f78583a085a4f
+    volumes:
+      - pocketdata:/pb_data
 
 volumes:
   pgdata:
   redisdata:
+  miniodata:
+  pocketdata:
