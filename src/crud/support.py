@@ -17,7 +17,7 @@ async def get_or_create_room(user_id: int, db: AsyncSession):
         return room
 
     room = Room(user_id=user_id)
-    db.add(room)
+    await db.add(room)
     await db.commit()
     await db.refresh(room)
     logger.info(f"Создана новая комната id={room.id} для user_id={user_id}")

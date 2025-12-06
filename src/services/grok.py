@@ -39,7 +39,7 @@ async def call_grok_model(
         try:
             resp = await client.post(settings.GROK_API_URL, json=payload, headers=headers)
             resp.raise_for_status()
-            result = resp.json()
+            result = await resp.json()
             logger.debug(f"Ответ от Grok для user_id={user_id}: {result}")
             return result
         except httpx.HTTPStatusError as e:
