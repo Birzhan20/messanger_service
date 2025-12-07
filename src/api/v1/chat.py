@@ -15,18 +15,22 @@ pb_client = PocketBaseClient()
 @router.post("/start/{announcement_id}")
 async def start_chat(announcement_id: int, user_id: int, db: AsyncSession = Depends(get_db),
 ):
+    """Создаёт или возвращает существующий чат по объявлению."""
     chat = await get_or_create_chat(announcement_id, user_id, db)
     return {"chat_id": chat.id}
 
 
 @router.get("/my")
 async def my_chats(user_id: int, db: AsyncSession = Depends(get_db)):
+    """Возвращает список чатов пользователя."""
     chats = await get_user_chats(db=db, user_id=user_id)
     return chats
 
 
 @router.get("/{chat_id}")
 async def open_chat(chat_id: int, user_id: int, db: AsyncSession = Depends(get_db),):
+    """Открывает чат и возвращает историю сообщений."""
+
     chat = await get_chat_with_messages(db=db, chat_id=chat_id, user_id=user_id)
     return chat
 
@@ -34,6 +38,8 @@ async def open_chat(chat_id: int, user_id: int, db: AsyncSession = Depends(get_d
 @router.post("/{chat_id}/send")
 async def send(user_id: int, chat_id: int, text: str = None, file: UploadFile = File(None),
                db: AsyncSession = Depends(get_db)):
+    """Отправляет сообщение (текст или файл) в чат."""
+
     file_url = None
     message_type = "text"
 

@@ -8,6 +8,7 @@ logger = logging.getLogger("crud.support")
 
 
 async def get_or_create_room(user_id: int, db: AsyncSession):
+    """Возвращает существующую комнату или создаёт новую."""
     logger.debug(f"Поиск комнаты для user_id={user_id}")
     q = select(Room).where(Room.user_id == user_id).order_by(desc(Room.created_at))
     room = (await db.execute(q)).scalars().first()
@@ -25,6 +26,7 @@ async def get_or_create_room(user_id: int, db: AsyncSession):
 
 
 async def get_last_messages(room_id: int, db: AsyncSession, limit: int = 20):
+    """Возвращает последние сообщения комнаты."""
     logger.debug(f"Получение последних {limit} сообщений для room_id={room_id}")
     q = (
         select(SupportChat)
@@ -39,6 +41,7 @@ async def get_last_messages(room_id: int, db: AsyncSession, limit: int = 20):
 
 
 async def save_message(room_id: int, sender: SenderType, message: str, db: AsyncSession):
+    """Сохраняет сообщение в БД."""
     logger.debug(f"Сохранение сообщения для room_id={room_id}, отправитель={sender}")
     msg = SupportChat(
         room_id=room_id,
@@ -50,3 +53,4 @@ async def save_message(room_id: int, sender: SenderType, message: str, db: Async
     await db.refresh(msg)
     logger.info(f"Сообщение сохранено id={msg.id} для room_id={room_id}")
     return msg
+

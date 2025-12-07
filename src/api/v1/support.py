@@ -17,6 +17,7 @@ router = APIRouter(prefix="/support", tags=["Support"])
 
 @router.get("/chat/{user_id}", response_model=list[SupportMessageOut])
 async def get_support_messages(user_id: int, db: AsyncSession = Depends(get_db)):
+    """Возвращает историю сообщений поддержки."""
     logger.info(f"Запрос GET /chat/{user_id}")
     try:
         room = await get_or_create_room(user_id, db)
@@ -30,6 +31,7 @@ async def get_support_messages(user_id: int, db: AsyncSession = Depends(get_db))
 
 @router.post("/chat", response_model=ChatResponse)
 async def support_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
+    """Отправляет сообщение в поддержку и возвращает ответ."""
     logger.info(f"Запрос POST /chat user_id={req.user_id}")
     if not req.user_id:
         logger.warning("Отсутствует user_id в запросе")
@@ -58,6 +60,7 @@ async def support_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
 
 @router.put("/prompt", status_code=status.HTTP_204_NO_CONTENT)
 async def update_prompt(req: UpdatePromptRequest):
+    """Обновляет системный промпт."""
     logger.info("Запрос PUT /prompt на обновление")
     try:
         write_prompt(req.content)
@@ -69,6 +72,7 @@ async def update_prompt(req: UpdatePromptRequest):
 
 @router.get("/prompt")
 async def get_prompt():
+    """Возвращает текущий системный промпт."""
     logger.info("Запрос GET /prompt")
     try:
         content = read_prompt()
@@ -81,6 +85,7 @@ async def get_prompt():
 
 @router.post("/prompt/upload", status_code=status.HTTP_201_CREATED)
 async def upload_file_prompt(file: UploadFile = File(...)):
+    """Загружает файл промпта (.txt, .md, .docx)."""
     logger.info(f"Запрос POST /prompt/upload файл={file.filename}")
     try:
         temp_path = Path(settings.SUPPORT_PROMPT_PATH).parent / file.filename

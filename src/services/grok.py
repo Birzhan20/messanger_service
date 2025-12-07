@@ -11,6 +11,8 @@ async def call_grok_model(
     user_id: str | None = None,
     history: list[SupportChat] | None = None
 ) -> dict:
+    """Отправляет запрос к Grok API и возвращает ответ."""
+
     if not settings.GROK_API_URL:
         logger.error("Не задан GROK_API_URL в настройках")
         raise RuntimeError("GROK_API_URL is not set")

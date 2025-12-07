@@ -9,4 +9,6 @@ redis_client = redis.Redis(
 )
 
 def get_redis() -> redis.Redis:
+    """Возвращает клиент Redis."""
     return redis_client
+

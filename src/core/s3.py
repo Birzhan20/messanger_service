@@ -12,6 +12,7 @@ URL = os.getenv("S3_URL")
 S3_URL = f"https://{URL}"
 
 async def upload_to_s3(file_obj: bytes, file_name: str):
+    """Загружает файл в S3 и возвращает публичный URL."""
     session = aioboto3.Session()
     async with session.client(
         service_name="s3",
@@ -25,7 +26,9 @@ async def upload_to_s3(file_obj: bytes, file_name: str):
     public_url = f"{S3_URL}/{S3_BUCKET}/{file_name}"
     return public_url
 
+
 async def delete_from_s3(file_name: str):
+    """Удаляет файл из S3."""
     session = aioboto3.Session()
     async with session.client(
         service_name="s3",
@@ -35,3 +38,4 @@ async def delete_from_s3(file_name: str):
         region_name="auto",
     ) as s3:
         await s3.delete_object(Bucket=S3_BUCKET, Key=file_name)
+

@@ -10,6 +10,7 @@ except ImportError:
 
 
 def _read_docx(path: Path) -> str:
+    """Читает текст из .docx файла."""
     if not DOCX_AVAILABLE:
         raise RuntimeError("python-docx не установлен")
     doc = Document(path)
@@ -17,6 +18,7 @@ def _read_docx(path: Path) -> str:
 
 
 def _write_docx(path: Path, content: str):
+    """Записывает текст в .docx файл."""
     if not DOCX_AVAILABLE:
         raise RuntimeError("python-docx не установлен")
     doc = Document()
@@ -26,6 +28,7 @@ def _write_docx(path: Path, content: str):
 
 
 def read_prompt() -> str:
+    """Читает системный промпт из кэша Redis или файла."""
     redis = get_redis()
     cached = redis.get("support_prompt")
     if cached:
@@ -48,6 +51,7 @@ def read_prompt() -> str:
 
 
 def write_prompt(content: str):
+    """Записывает промпт в файл и обновляет кэш Redis."""
     path = Path(settings.SUPPORT_PROMPT_PATH)
 
     if path.suffix.lower() == ".docx":
@@ -60,6 +64,7 @@ def write_prompt(content: str):
 
 
 def upload_prompt(file_path: Path):
+    """Загружает промпт из файла и сохраняет его."""
     if not file_path.exists():
         raise FileNotFoundError(f"{file_path} не найден")
 
@@ -72,3 +77,4 @@ def upload_prompt(file_path: Path):
 
     write_prompt(content)
     return content
+
