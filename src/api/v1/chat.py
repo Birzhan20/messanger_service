@@ -7,6 +7,7 @@ from crud.chat_service import (
 
 from core.s3 import upload_to_s3
 from core.pocketbase_client import PocketBaseClient
+from api.v1.websocket import get_manager
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 pb_client = PocketBaseClient()
@@ -21,15 +22,25 @@ async def start_chat(announcement_id: int, user_id: int, db: AsyncSession = Depe
 
 
 @router.get("/my")
-async def my_chats(user_id: int, db: AsyncSession = Depends(get_db)):
-    """Возвращает список чатов пользователя."""
-    chats = await get_user_chats(db=db, user_id=user_id)
+async def my_chats(
+    user_id: int,
+    role: str = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Возвращает список чатов пользователя.
+    
+    Args:
+        user_id: ID пользователя
+        role: Фильтр по роли - "buyer" (Покупаю) или "seller" (Продаю)
+    """
+    chats = await get_user_chats(db=db, user_id=user_id, role=role)
     return chats
 
 
 @router.get("/{chat_id}")
 async def open_chat(chat_id: int, user_id: int, db: AsyncSession = Depends(get_db),):
-    """Открывает чат и возвращает историю сообщений."""
+    """Открывает чат и возвращает историю сообщений с данными партнёра."""
 
     chat = await get_chat_with_messages(db=db, chat_id=chat_id, user_id=user_id)
     return chat
@@ -38,7 +49,7 @@ async def open_chat(chat_id: int, user_id: int, db: AsyncSession = Depends(get_d
 @router.post("/{chat_id}/send")
 async def send(user_id: int, chat_id: int, text: str = None, file: UploadFile = File(None),
                db: AsyncSession = Depends(get_db)):
-    """Отправляет сообщение (текст или файл) в чат."""
+    """Отправляет сообщение (текст или файл) в чат и рассылает через WebSocket."""
 
     file_url = None
     message_type = "text"
@@ -57,4 +68,21 @@ async def send(user_id: int, chat_id: int, text: str = None, file: UploadFile = 
 
     message = await send_message(db=db, chat_id=chat_id, sender_id=user_id, text=text, file_url=file_url,
                                  message_type=message_type)
+    
+    # Broadcast через WebSocket
+    manager = get_manager()
+    await manager.broadcast(chat_id, {
+        "type": "message",
+        "data": {
+            "id": message.id,
+            "chat_id": message.chat_id,
+            "sender_id": message.sender_id,
+            "message_text": message.message_text,
+            "message_type": message.message_type,
+            "file_url": message.file_url,
+            "is_read": message.is_read,
+            "created_at": message.created_at.isoformat() if message.created_at else None
+        }
+    })
+    
     return message

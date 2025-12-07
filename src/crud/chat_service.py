@@ -29,6 +29,7 @@ async def get_or_create_chat(announcement_id: int, buyer_id: int, db: AsyncSessi
 
         chat = Chat(
             announcement_id=announcement_id,
+            seller_id=announcement.user_id,
             buyer_id=buyer_id,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
@@ -86,32 +87,54 @@ async def send_message(chat_id: int, sender_id: int, db: AsyncSession, text: str
     return message
 
 
-async def get_user_chats(db: "AsyncSession", user_id: int):
-    """Все чаты пользователя (покупатель или продавец)"""
-    result = await db.execute(
+async def get_user_chats(db: "AsyncSession", user_id: int, role: str = None):
+    """
+    Все чаты пользователя (покупатель или продавец).
+    
+    Args:
+        db: AsyncSession
+        user_id: ID пользователя
+        role: Фильтр - "buyer" (Покупаю) или "seller" (Продаю), None = все чаты
+    """
+    query = (
         select(Chat)
         .join(Announcement)
         .options(
             selectinload(Chat.ad),
             selectinload(Chat.buyer),
         )
-        .where(
+    )
+    
+    if role == "buyer":
+        # Показываем чаты, где пользователь — покупатель
+        query = query.where(Chat.buyer_id == user_id)
+    elif role == "seller":
+        # Показываем чаты, где пользователь — продавец (владелец объявления)
+        query = query.where(Announcement.user_id == user_id)
+    else:
+        # Все чаты пользователя
+        query = query.where(
             or_(
                 Chat.buyer_id == user_id,
                 Announcement.user_id == user_id
             )
         )
-        .order_by(Chat.last_message_at.desc().nulls_last())
-    )
+    
+    query = query.order_by(Chat.last_message_at.desc().nulls_last())
+    result = await db.execute(query)
     return result.scalars().all()
 
 
 async def get_chat_with_messages(chat_id: int, user_id: int, db: AsyncSession):
-    """Открыть чат + историю + отметить прочитанными"""
+    """
+    Открыть чат + историю + отметить прочитанными.
+    
+    Возвращает чат с информацией о партнёре (имя, телефон, роль).
+    """
     result = await db.execute(
         select(Chat)
         .options(
-            selectinload(Chat.ad).selectinload(Announcement.user_id),
+            selectinload(Chat.ad).selectinload(Announcement.seller),
             selectinload(Chat.buyer),
             selectinload(Chat.messages).selectinload(Message.sender)
         )
@@ -139,5 +162,42 @@ async def get_chat_with_messages(chat_id: int, user_id: int, db: AsyncSession):
         .values(is_read=True)
     )
     await db.commit()
-
-    return chat
+    
+    # Определяем партнёра (если я покупатель - партнёр продавец, и наоборот)
+    if chat.buyer_id == user_id:
+        # Я покупатель, партнёр - продавец
+        partner = chat.ad.seller if chat.ad else None
+    else:
+        # Я продавец, партнёр - покупатель
+        partner = chat.buyer
+    
+    # Формируем ответ с информацией о партнёре
+    partner_info = None
+    if partner:
+        # Определяем роль по user_role_id (1-2 = Бизнес, 3+ = Частное лицо)
+        role = "Бизнес" if partner.user_role_id and partner.user_role_id <= 2 else "Частное лицо"
+        partner_info = {
+            "id": partner.id,
+            "name": partner.company_name or partner.name,
+            "phone": partner.representative_phone,
+            "company_name": partner.company_name,
+            "role": role
+        }
+    
+    return {
+        "id": chat.id,
+        "announcement_id": chat.announcement_id,
+        "partner": partner_info,
+        "messages": [
+            {
+                "id": msg.id,
+                "sender_id": msg.sender_id,
+                "message_text": msg.message_text,
+                "message_type": msg.message_type,
+                "file_url": msg.file_url,
+                "is_read": msg.is_read,
+                "created_at": msg.created_at.isoformat() if msg.created_at else None
+            }
+            for msg in sorted(chat.messages, key=lambda m: m.created_at or datetime.min)
+        ]
+    }

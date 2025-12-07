@@ -11,6 +11,7 @@ class Chat(Base):
 
     id = Column(BigInteger, primary_key=True)
     announcement_id = Column(BigInteger, ForeignKey('announcements.id'), nullable=False)
+    seller_id = Column(BigInteger, ForeignKey('users.id'), nullable=False)
     buyer_id = Column(BigInteger, ForeignKey('users.id'), nullable=False)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
@@ -19,7 +20,8 @@ class Chat(Base):
     last_message_at = Column(DateTime, nullable=True)
 
     ad = relationship("Announcement", back_populates="chats")
-    buyer = relationship("User", back_populates="buyer_chats")
+    seller = relationship("User", foreign_keys=[seller_id])
+    buyer = relationship("User", foreign_keys=[buyer_id], back_populates="buyer_chats")
     messages = relationship("Message", back_populates="chat", cascade="all, delete-orphan")
 
     __table_args__ = (

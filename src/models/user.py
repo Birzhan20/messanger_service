@@ -69,4 +69,4 @@ class User(Base):
     meta_status = Column(SmallInteger, nullable=False, default=0)
 
     sent_messages = relationship("Message", back_populates="sender")
-    buyer_chats = relationship("Chat", back_populates="buyer")
+    buyer_chats = relationship("Chat", foreign_keys="[Chat.buyer_id]", back_populates="buyer")
