@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from pydantic import ConfigDict, AnyHttpUrl
+from pydantic import ConfigDict, AnyUrl
 
 class Settings(BaseSettings):
     GROK_API_URL: str = ""
@@ -17,6 +17,16 @@ class Settings(BaseSettings):
     POCKETBASE_ADMIN_PASSWORD: str
     POCKETBASE_COLLECTION: str
     POCKETBASE_FIELD_NAME: str
+
+    S3_ENDPOINT: AnyUrl
+    S3_ACCESS_KEY: str
+    S3_SECRET_KEY: str
+    S3_BUCKET: str
+    S3_REGION: str = "us-east-1"
+
+    @property
+    def S3_URL(self) -> str:
+        return f"{str(self.S3_ENDPOINT).rstrip('/')}/{self.S3_BUCKET}"
 
     model_config = ConfigDict(
         env_file=".env",

@@ -3,6 +3,27 @@
 3) Примените алембик миграций
 4) Запустите докер
 
+Настройки Pocketbase
+1) Создайте новую коллекцию по ссылке "http://localhost:8090/_/#/collections?collection=_pb_users_auth_&filter=&sort=-%40rowid"
+    name = "documents"
+    create new fiels --> "field"
+
+2) В настройках добавьте данные "http://localhost:8090/_/#/settings"
+    и кликните "Force path-style addressing"
+
+.env for pocketbase
+```
+POCKETBASE_ADMIN_EMAIL=admin@mytrade.kz
+POCKETBASE_ADMIN_PASSWORD=""
+POCKETBASE_URL=http://pocketbase:8090
+POCKETBASE_COLLECTION=documents
+POCKETBASE_FIELD_NAME=document
+
+S3_ENDPOINT=http://minio:9000
+S3_ACCESS_KEY=""
+S3_SECRET_KEY=""
+S3_BUCKET=mytrade-files
+```
 
 .env example
 ```
