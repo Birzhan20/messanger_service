@@ -1,7 +1,7 @@
 from datetime import datetime
-from sqlalchemy import select, update, or_, func
+from sqlalchemy import select, update, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, joinedload, aliased
+from sqlalchemy.orm import selectinload, joinedload
 from fastapi import HTTPException, status
 
 from models.chat import Chat
@@ -10,45 +10,33 @@ from models.messages import Message
 from models.user import User
 
 
-async def get_or_create_chat(announcement_id: int, buyer_id: int, seller_id: int, db: AsyncSession):
-    """Создаёт или возвращает существующий чат (как в мессенджере: 1 чат = 1 покупатель + 1 продавец + 1 объявление)"""
-
+async def get_or_create_chat(announcement_id: int, buyer_id: int, db: AsyncSession):
+    """Получить чат или создать новый (кнопка 'Написать')"""
+    # Ищем существующий чат
     result = await db.execute(
         select(Chat).where(
             Chat.announcement_id == announcement_id,
-            Chat.seller_id == seller_id,
             Chat.buyer_id == buyer_id
         )
     )
     chat = result.scalar_one_or_none()
 
-    if chat:
-        return chat
+    if not chat:
+        result = await db.execute(select(Announcement).where(Announcement.id == announcement_id))
+        announcement = result.scalar_one_or_none()
+        if not announcement:
+            raise HTTPException(status_code=404, detail="Объявление не найдено")
 
-    # Проверяем, существует ли объявление
-    result = await db.execute(
-        select(Announcement).where(Announcement.id == announcement_id)
-    )
-    announcement = result.scalar_one_or_none()
-    print(announcement.user_id)
-    if not announcement:
-        raise HTTPException(status_code=404, detail="Объявление не найдено")
-
-    # Проверяем, что seller_id действительно владелец объявления (безопасность!)
-    if announcement.user_id != seller_id:
-        raise HTTPException(status_code=403, detail="Вы не являетесь владельцем этого объявления")
-
-    chat = Chat(
-        announcement_id=announcement_id,
-        seller_id=seller_id,
-        buyer_id=buyer_id,
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
-    )
-    db.add(chat)
-    await db.flush()
-    await db.commit()
-    await db.refresh(chat)
+        chat = Chat(
+            announcement_id=announcement_id,
+            seller_id=announcement.user_id,
+            buyer_id=buyer_id,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        db.add(chat)
+        await db.commit()
+        await db.refresh(chat)
 
     return chat
 
@@ -99,100 +87,69 @@ async def send_message(chat_id: int, sender_id: int, db: AsyncSession, text: str
     return message
 
 
-async def get_user_chats(db: "AsyncSession", user_id: int, tab: str = "all", search_query: str = None):
-    """Все чаты пользователя (покупатель или продавец)"""
-    seller_alias = aliased(User)
-    buyer_alias = aliased(User)
-
-    # Базовый запрос
+async def get_user_chats(db: "AsyncSession", user_id: int, role: str = None):
+    """
+    Все чаты пользователя (покупатель или продавец).
+    
+    Args:
+        db: AsyncSession
+        user_id: ID пользователя
+        role: Фильтр - "buyer" (Покупаю) или "seller" (Продаю), None = все чаты
+    """
     query = (
-        select(
-            Chat,
-            func.count(Message.id).filter(
-                Message.is_read == False,
-                Message.sender_id != user_id
-            ).label("unread_count"),
-            seller_alias,
-            buyer_alias
+        select(Chat)
+        .join(Announcement)
+        .options(
+            selectinload(Chat.ad),
+            selectinload(Chat.buyer),
         )
-        .join(Announcement, Chat.announcement_id == Announcement.id)
-        .join(seller_alias, Announcement.user_id == seller_alias.id)
-        .join(buyer_alias, Chat.buyer_id == buyer_alias.id)
-        .outerjoin(Message, Chat.id == Message.chat_id)
-        .group_by(Chat.id, Announcement.id, seller_alias.id, buyer_alias.id)
-        .order_by(Chat.last_message_at.desc().nulls_last())
     )
-
-    if tab == "buying":
+    
+    if role == "buyer":
+        # Показываем чаты, где пользователь — покупатель
         query = query.where(Chat.buyer_id == user_id)
-    elif tab == "selling":
+    elif role == "seller":
+        # Показываем чаты, где пользователь — продавец (владелец объявления)
         query = query.where(Announcement.user_id == user_id)
     else:
+        # Все чаты пользователя
         query = query.where(
             or_(
                 Chat.buyer_id == user_id,
                 Announcement.user_id == user_id
             )
         )
-
+    
+    query = query.order_by(Chat.last_message_at.desc().nulls_last())
     result = await db.execute(query)
-    rows = result.all()
-
-    chats_data = []
-    for chat, unread_count, seller, buyer in rows:
-        # Определяем партнера
-        if chat.buyer_id == user_id:
-            partner = seller
-        else:
-            partner = buyer
-
-        if search_query and search_query.lower() not in partner.name.lower():
-            continue
-
-        chats_data.append({
-            "id": chat.id,
-            "partner_id": partner.id,
-            "partner_name": partner.name,
-            "partner_avatar": None,
-            "partner_phone": partner.representative_phone,
-            "partner_role_id": partner.user_role_id,
-            "last_message": chat.last_message_text,
-            "last_message_type": chat.last_message_type,
-            "last_message_at": chat.last_message_at,
-            "unread_count": unread_count,
-            "is_online": False
-        })
-
-    return chats_data
+    return result.scalars().all()
 
 
 async def get_chat_with_messages(chat_id: int, user_id: int, db: AsyncSession):
-    """Открыть чат + историю + отметить прочитанными"""
-    seller_alias = aliased(User)
-    buyer_alias = aliased(User)
-
+    """
+    Открыть чат + историю + отметить прочитанными.
+    
+    Возвращает чат с информацией о партнёре (имя, телефон, роль).
+    """
     result = await db.execute(
-        select(Chat, seller_alias, buyer_alias)
-        .join(Announcement, Chat.announcement_id == Announcement.id)
-        .join(seller_alias, Announcement.user_id == seller_alias.id)
-        .join(buyer_alias, Chat.buyer_id == buyer_alias.id)
+        select(Chat)
         .options(
+            selectinload(Chat.ad).selectinload(Announcement.seller),
+            selectinload(Chat.buyer),
             selectinload(Chat.messages).selectinload(Message.sender)
         )
         .where(
             Chat.id == chat_id,
             or_(
                 Chat.buyer_id == user_id,
-                Announcement.user_id == user_id
+                Chat.ad.has(Announcement.user_id == user_id)
             )
         )
     )
-    row = result.first()
+    chat = result.scalar_one_or_none()
 
-    if not row:
+    if not chat:
         raise HTTPException(status_code=404, detail="Чат не найден или доступ запрещён")
-
-    chat, seller, buyer = row
 
     # Отмечаем входящие сообщения прочитанными
     await db.execute(
@@ -205,21 +162,42 @@ async def get_chat_with_messages(chat_id: int, user_id: int, db: AsyncSession):
         .values(is_read=True)
     )
     await db.commit()
-
-    # Определяем партнера
+    
+    # Определяем партнёра (если я покупатель - партнёр продавец, и наоборот)
     if chat.buyer_id == user_id:
-        partner = seller
+        # Я покупатель, партнёр - продавец
+        partner = chat.ad.seller if chat.ad else None
     else:
-        partner = buyer
-
+        # Я продавец, партнёр - покупатель
+        partner = chat.buyer
+    
+    # Формируем ответ с информацией о партнёре
+    partner_info = None
+    if partner:
+        # Определяем роль по user_role_id (1-2 = Бизнес, 3+ = Частное лицо)
+        role = "Бизнес" if partner.user_role_id and partner.user_role_id <= 2 else "Частное лицо"
+        partner_info = {
+            "id": partner.id,
+            "name": partner.company_name or partner.name,
+            "phone": partner.representative_phone,
+            "company_name": partner.company_name,
+            "role": role
+        }
+    
     return {
         "id": chat.id,
         "announcement_id": chat.announcement_id,
-        "partner_id": partner.id,
-        "partner_name": partner.name,
-        "partner_avatar": None,
-        "partner_phone": partner.representative_phone,
-        "partner_role_id": partner.user_role_id,
-        "partner_online": False,
-        "messages": chat.messages
+        "partner": partner_info,
+        "messages": [
+            {
+                "id": msg.id,
+                "sender_id": msg.sender_id,
+                "message_text": msg.message_text,
+                "message_type": msg.message_type,
+                "file_url": msg.file_url,
+                "is_read": msg.is_read,
+                "created_at": msg.created_at.isoformat() if msg.created_at else None
+            }
+            for msg in sorted(chat.messages, key=lambda m: m.created_at or datetime.min)
+        ]
     }

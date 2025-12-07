@@ -1,48 +1,63 @@
-from typing import List, Optional
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Query
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from crud.chat_service import (
     get_or_create_chat, send_message, get_user_chats, get_chat_with_messages
 )
-from schemas.chat import ChatListResponse, ChatDetailResponse, MessageResponse
+
 from core.s3 import upload_to_s3
+from core.pocketbase_client import PocketBaseClient
+from api.v1.websocket import get_manager
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
+pb_client = PocketBaseClient()
 
 
 @router.post("/start/{announcement_id}")
-async def start_chat(announcement_id: int, buyer_id: int, seller_id: int, db: AsyncSession = Depends(get_db)):
-    chat = await get_or_create_chat(announcement_id, buyer_id, seller_id, db)
+async def start_chat(announcement_id: int, user_id: int, db: AsyncSession = Depends(get_db),
+):
+    """Создаёт или возвращает существующий чат по объявлению."""
+    chat = await get_or_create_chat(announcement_id, user_id, db)
     return {"chat_id": chat.id}
 
 
-@router.get("/my", response_model=List[ChatListResponse])
+@router.get("/my")
 async def my_chats(
     user_id: int,
-    tab: str = Query("all", enum=["all", "buying", "selling"]),
-    search: Optional[str] = None,
+    role: str = None,
     db: AsyncSession = Depends(get_db)
 ):
-    chats = await get_user_chats(db=db, user_id=user_id, tab=tab, search_query=search)
+    """
+    Возвращает список чатов пользователя.
+    
+    Args:
+        user_id: ID пользователя
+        role: Фильтр по роли - "buyer" (Покупаю) или "seller" (Продаю)
+    """
+    chats = await get_user_chats(db=db, user_id=user_id, role=role)
     return chats
 
 
-@router.get("/{chat_id}", response_model=ChatDetailResponse)
+@router.get("/{chat_id}")
 async def open_chat(chat_id: int, user_id: int, db: AsyncSession = Depends(get_db),):
-    chat_data = await get_chat_with_messages(db=db, chat_id=chat_id, user_id=user_id)
-    return chat_data
+    """Открывает чат и возвращает историю сообщений с данными партнёра."""
+
+    chat = await get_chat_with_messages(db=db, chat_id=chat_id, user_id=user_id)
+    return chat
 
 
-@router.post("/{chat_id}/send", response_model=MessageResponse)
+@router.post("/{chat_id}/send")
 async def send(user_id: int, chat_id: int, text: str = None, file: UploadFile = File(None),
                db: AsyncSession = Depends(get_db)):
+    """Отправляет сообщение (текст или файл) в чат и рассылает через WebSocket."""
+
     file_url = None
     message_type = "text"
 
     if file:
         file_bytes = await file.read()
-        file_url = await upload_to_s3(file_bytes, file.filename)
+        file_url = await pb_client.upload_file(file_bytes, file.filename)
+        # file_url = await upload_to_s3(file_bytes, file.filename)
         content_type = file.content_type or ""
         if content_type.startswith("image/"):
             message_type = "image"
@@ -53,4 +68,21 @@ async def send(user_id: int, chat_id: int, text: str = None, file: UploadFile = 
 
     message = await send_message(db=db, chat_id=chat_id, sender_id=user_id, text=text, file_url=file_url,
                                  message_type=message_type)
+    
+    # Broadcast через WebSocket
+    manager = get_manager()
+    await manager.broadcast(chat_id, {
+        "type": "message",
+        "data": {
+            "id": message.id,
+            "chat_id": message.chat_id,
+            "sender_id": message.sender_id,
+            "message_text": message.message_text,
+            "message_type": message.message_type,
+            "file_url": message.file_url,
+            "is_read": message.is_read,
+            "created_at": message.created_at.isoformat() if message.created_at else None
+        }
+    })
+    
     return message

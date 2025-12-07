@@ -10,9 +10,9 @@ from core.database import Base
 class Announcement(Base):
     __tablename__ = "announcements"
 
-    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
 
-    user_id = Column(BigInteger)
+    user_id = Column(BigInteger, ForeignKey("users.id"))
     product_id = Column(BigInteger)
     deal_type_id = Column(BigInteger)
 
@@ -86,4 +86,6 @@ class Announcement(Base):
     published_time = Column(Time)
     unpublish_time = Column(Time)
 
-    chats = relationship("Chat", back_populates="announcement")
+    # Relationships
+    seller = relationship("User", foreign_keys=[user_id])
+    chats = relationship("Chat", back_populates="ad")

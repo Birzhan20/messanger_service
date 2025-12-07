@@ -1,48 +1,66 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
-class MessageResponse(BaseModel):
+class PartnerInfo(BaseModel):
+    """Информация о партнёре в чате."""
+    id: int
+    name: str
+    phone: Optional[str] = Field(None, description="Номер телефона партнёра")
+    company_name: Optional[str] = None
+    role: str = Field(description="Роль: 'Бизнес' или 'Частное лицо'")
+    
+    class Config:
+        from_attributes = True
+
+
+class MessageItem(BaseModel):
+    """Сообщение в чате."""
     id: int
     sender_id: int
-    message_text: Optional[str]
-    message_type: str
-    file_url: Optional[str]
-    is_read: bool
-    created_at: datetime
-
+    message_text: Optional[str] = None
+    message_type: str = "text"
+    file_url: Optional[str] = None
+    is_read: bool = False
+    created_at: Optional[datetime] = None
+    
     class Config:
         from_attributes = True
 
 
-class ChatListResponse(BaseModel):
+class ChatListItem(BaseModel):
+    """Элемент списка чатов."""
     id: int
-    partner_id: int
-    partner_name: str
-    partner_avatar: Optional[str]
-    partner_phone: Optional[str]
-    partner_role_id: Optional[int]
-    last_message: Optional[str]
-    last_message_type: str
-    last_message_at: Optional[datetime]
-    unread_count: int
-    is_online: bool = False
-
+    partner: PartnerInfo
+    announcement_title: Optional[str] = None
+    last_message_text: Optional[str] = None
+    last_message_type: str = "text"
+    last_message_at: Optional[datetime] = None
+    unread_count: int = 0
+    
     class Config:
         from_attributes = True
 
 
-class ChatDetailResponse(BaseModel):
+class ChatDetail(BaseModel):
+    """Детальная информация о чате с историей сообщений."""
     id: int
+    partner: PartnerInfo
     announcement_id: int
-    partner_id: int
-    partner_name: str
-    partner_avatar: Optional[str]
-    partner_phone: Optional[str]
-    partner_role_id: Optional[int]
-    partner_online: bool = False
-    messages: List[MessageResponse]
-
+    announcement_title: Optional[str] = None
+    messages: List[MessageItem] = []
+    
     class Config:
         from_attributes = True
+
+
+class SendMessageRequest(BaseModel):
+    """Запрос на отправку сообщения."""
+    text: Optional[str] = None
+    
+    
+class WebSocketMessage(BaseModel):
+    """Формат WebSocket сообщения."""
+    type: str = Field(description="Тип: 'message', 'pong', 'error'")
+    data: Optional[dict] = None
