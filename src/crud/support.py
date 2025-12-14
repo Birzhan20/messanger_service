@@ -54,3 +54,26 @@ async def save_message(room_id: int, sender: SenderType, message: str, db: Async
     logger.info(f"Сообщение сохранено id={msg.id} для room_id={room_id}")
     return msg
 
+async def activate_agent(room_id: int, db: AsyncSession):
+    q = select(Room).where(Room.id == room_id)
+    room = (await db.execute(q)).scalars().first()
+
+    if not room:
+        return None
+
+    room.is_agent_active = True
+    await db.commit()
+    await db.refresh(room)
+    return room
+
+async def deactivate_agent(room_id: int, db: AsyncSession):
+    q = select(Room).where(Room.id == room_id)
+    room = (await db.execute(q)).scalars().first()
+
+    if not room:
+        return None
+
+    room.is_agent_active = False
+    await db.commit()
+    await db.refresh(room)
+    return room

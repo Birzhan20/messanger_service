@@ -12,7 +12,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     """Ответ от поддержки."""
-    reply: str
+    reply: Optional[str]
     raw: Optional[dict] = None
 
 

@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, Enum, ForeignKey, DateTime, func
+from sqlalchemy import Column, Boolean, Integer, String, Enum, ForeignKey, DateTime, func
 from sqlalchemy.orm import relationship
 from core.database import Base
 
@@ -14,6 +14,7 @@ class Room(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, nullable=False)
+    is_agent_active = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     messages = relationship("SupportChat", back_populates="room")

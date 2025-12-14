@@ -9,6 +9,8 @@ from crud.support import get_or_create_room, get_last_messages, save_message
 from core.database import get_db
 from models.support import SenderType
 from sqlalchemy.ext.asyncio import AsyncSession
+from schemas.user_context import UserAIContextOut
+from services.get_user_info_ai import get_user_ai_context
 
 logger = logging.getLogger("api.support")
 
@@ -29,33 +31,33 @@ async def get_support_messages(user_id: int, db: AsyncSession = Depends(get_db))
         raise HTTPException(500, f"Внутренняя ошибка: {e}")
 
 
-@router.post("/chat", response_model=ChatResponse)
-async def support_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
-    """Отправляет сообщение в поддержку и возвращает ответ."""
-    logger.info(f"Запрос POST /chat user_id={req.user_id}")
-    if not req.user_id:
-        logger.warning("Отсутствует user_id в запросе")
-        raise HTTPException(400, "user_id is required")
+# @router.post("/chat", response_model=ChatResponse)
+# async def support_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
+#     """Отправляет сообщение в поддержку и возвращает ответ."""
+#     logger.info(f"Запрос POST /chat user_id={req.user_id}")
+#     if not req.user_id:
+#         logger.warning("Отсутствует user_id в запросе")
+#         raise HTTPException(400, "user_id is required")
 
-    room = await get_or_create_room(req.user_id, db)
+#     room = await get_or_create_room(req.user_id, db)
 
-    await save_message(room_id=room.id, sender=SenderType.user, message=req.message, db=db)
-    logger.debug(f"Сохранено сообщение от пользователя для room_id={room.id}")
+#     await save_message(room_id=room.id, sender=SenderType.user, message=req.message, db=db)
+#     logger.debug(f"Сохранено сообщение от пользователя для room_id={room.id}")
 
-    history = await get_last_messages(room.id, db)
+#     history = await get_last_messages(room.id, db)
 
-    try:
-        model_resp = await call_grok_model(message=req.message, user_id=req.user_id, history=history)
-    except Exception as e:
-        logger.exception(f"Ошибка модели Grok для user_id={req.user_id}: {e}")
-        raise HTTPException(500, f"Grok model error: {e}")
+#     try:
+#         model_resp = await call_grok_model(message=req.message, user_id=req.user_id, history=history, db=db)
+#     except Exception as e:
+#         logger.exception(f"Ошибка модели Grok для user_id={req.user_id}: {e}")
+#         raise HTTPException(500, f"Grok model error: {e}")
 
-    reply = model_resp.get("reply") or model_resp.get("text") or model_resp.get("message") or str(model_resp)
+#     reply = model_resp.get("reply") or model_resp.get("text") or model_resp.get("message") or str(model_resp)
 
-    await save_message(room_id=room.id, sender=SenderType.assistant, message=reply, db=db)
-    logger.info(f"Отправлен ответ пользователю user_id={req.user_id} для room_id={room.id}")
+#     await save_message(room_id=room.id, sender=SenderType.assistant, message=reply, db=db)
+#     logger.info(f"Отправлен ответ пользователю user_id={req.user_id} для room_id={room.id}")
 
-    return ChatResponse(reply=reply, raw=model_resp)
+#     return ChatResponse(reply=reply, raw=model_resp)
 
 
 @router.put("/prompt", status_code=status.HTTP_204_NO_CONTENT)
@@ -98,3 +100,85 @@ async def upload_file_prompt(file: UploadFile = File(...)):
         raise HTTPException(500, f"Prompt upload error: {e}")
 
     return {"filename": file.filename, "status": "uploaded", "content_length": len(content)}
+
+@router.get("/ai-context/{user_id}", response_model=UserAIContextOut)
+async def get_ai_context(user_id: int, db: AsyncSession = Depends(get_db)):
+    """Возвращает AI-контекст пользователя: объявления, чаты, историю сообщений."""
+    logger.info(f"GET /support/ai-context/{user_id}")
+
+    try:
+        result = await get_user_ai_context(user_id=user_id, db=db)
+        if not result:
+            logger.warning(f"User {user_id} not found")
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return result
+
+    except Exception as e:
+        logger.exception(f"Ошибка в get_user_ai_context для user_id={user_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {e}")
+
+from crud.support import activate_agent
+@router.post("/chat", response_model=ChatResponse)
+async def support_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
+    logger.info(f"Запрос POST /chat user_id={req.user_id}")
+
+    if not req.user_id:
+        raise HTTPException(400, "user_id is required")
+
+    room = await get_or_create_room(req.user_id, db)
+
+    # 1. Сохраняем пользовательское сообщение
+    await save_message(room_id=room.id, sender=SenderType.user, message=req.message, db=db)
+
+    # 2. Если оператор уже подключён → ИИ не вызываем
+    if room.is_agent_active:
+        logger.info(f"Room {room.id} is handled by human agent — AI skipped.")
+        return ChatResponse(reply=None, raw={"status": "agent_active"})
+
+    # 3. Собираем историю сообщений для ИИ
+    history = await get_last_messages(room.id, db)
+
+    # 4. Вызываем ИИ только если активен
+    model_resp = await call_grok_model(
+        message=req.message,
+        user_id=req.user_id,
+        history=history,
+        db=db
+    )
+
+    reply = (
+        model_resp.get("reply")
+        or model_resp.get("text")
+        or model_resp.get("message")
+        or str(model_resp)
+    )
+
+    # 5. Проверяем, нужно ли передать оператору
+    need_human = model_resp.get("handover") is True
+
+    if need_human:
+        service_msg = "Подключаю модератора к чату, пожалуйста, ожидайте несколько секунд."
+
+        await save_message(
+            room_id=room.id,
+            sender=SenderType.assistant,
+            message=service_msg,
+            db=db
+        )
+
+        # Включаем режим оператора
+        await activate_agent(room.id, db)
+        logger.info(f"Чат room_id={room.id} переведён в режим оператора")
+
+        return ChatResponse(reply=service_msg, raw=model_resp)
+
+    # 6. Обычный ответ ИИ
+    await save_message(
+        room_id=room.id,
+        sender=SenderType.assistant,
+        message=reply,
+        db=db
+    )
+
+    return ChatResponse(reply=reply, raw=model_resp)

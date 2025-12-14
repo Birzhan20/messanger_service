@@ -1,3 +1,11 @@
+from .user import User
+from .announcement import Announcement
+from .chat import Chat
+from .messages import Message
+
+__all__ = ["User", "Announcement", "Chat", "Message"]
+
+
 """
 CREATE TABLE IF NOT EXISTS chats (
     id BIGSERIAL PRIMARY KEY,
