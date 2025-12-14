@@ -119,27 +119,39 @@ async def get_ai_context(user_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Internal error: {e}")
 
 from crud.support import activate_agent
+
+from crud.support import get_or_create_room, get_last_messages, save_message, activate_agent, deactivate_agent
+
 @router.post("/chat", response_model=ChatResponse)
 async def support_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
-    logger.info(f"Запрос POST /chat user_id={req.user_id}")
+    logger.info(f"POST /chat user_id={req.user_id}")
 
     if not req.user_id:
         raise HTTPException(400, "user_id is required")
 
+    # 1. Получаем или создаём комнату
     room = await get_or_create_room(req.user_id, db)
 
-    # 1. Сохраняем пользовательское сообщение
-    await save_message(room_id=room.id, sender=SenderType.user, message=req.message, db=db)
+    # 2. Сохраняем сообщение пользователя
+    await save_message(
+        room_id=room.id,
+        sender=SenderType.user,
+        message=req.message,
+        db=db
+    )
 
-    # 2. Если оператор уже подключён → ИИ не вызываем
+    # 3. Если уже оператор — ИИ не участвует
     if room.is_agent_active:
-        logger.info(f"Room {room.id} is handled by human agent — AI skipped.")
-        return ChatResponse(reply=None, raw={"status": "agent_active"})
+        logger.info(f"Room {room.id} already handled by human")
+        return ChatResponse(
+            reply=None,
+            raw={"status": "agent_active"}
+        )
 
-    # 3. Собираем историю сообщений для ИИ
+    # 4. История сообщений
     history = await get_last_messages(room.id, db)
 
-    # 4. Вызываем ИИ только если активен
+    # 5. Вызов ИИ
     model_resp = await call_grok_model(
         message=req.message,
         user_id=req.user_id,
@@ -147,17 +159,8 @@ async def support_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
         db=db
     )
 
-    reply = (
-        model_resp.get("reply")
-        or model_resp.get("text")
-        or model_resp.get("message")
-        or str(model_resp)
-    )
-
-    # 5. Проверяем, нужно ли передать оператору
-    need_human = model_resp.get("handover") is True
-
-    if need_human:
+    # 6. HANDOVER — первым и без ответа ИИ
+    if model_resp.get("handover") is True:
         service_msg = "Подключаю модератора к чату, пожалуйста, ожидайте несколько секунд."
 
         await save_message(
@@ -167,13 +170,22 @@ async def support_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
             db=db
         )
 
-        # Включаем режим оператора
         await activate_agent(room.id, db)
-        logger.info(f"Чат room_id={room.id} переведён в режим оператора")
+        logger.info(f"Room {room.id} switched to human agent")
 
-        return ChatResponse(reply=service_msg, raw=model_resp)
+        return ChatResponse(
+            reply=service_msg,
+            raw={"status": "agent_active"}
+        )
 
-    # 6. Обычный ответ ИИ
+    # 7. Обычный ответ ИИ
+    reply = (
+        model_resp.get("reply")
+        or model_resp.get("text")
+        or model_resp.get("message")
+        or ""
+    )
+
     await save_message(
         room_id=room.id,
         sender=SenderType.assistant,
@@ -181,4 +193,8 @@ async def support_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
         db=db
     )
 
-    return ChatResponse(reply=reply, raw=model_resp)
+    return ChatResponse(
+        reply=reply,
+        raw=model_resp
+    )
+

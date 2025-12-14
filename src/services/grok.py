@@ -5,7 +5,7 @@ from core.config import settings
 from services.prompts import read_prompt
 from models.support import SupportChat, SenderType
 from sqlalchemy.ext.asyncio import AsyncSession
-from services.get_user_info_ai import get_user_ai_context 
+from services.get_user_info_ai import get_user_ai_context
 
 logger = logging.getLogger("services.grok")
 
@@ -19,12 +19,7 @@ async def call_grok_model(
 ) -> dict:
     """
     Отправляет запрос к Grok API и возвращает ответ.
-
-    Параметры:
-    - message: текст сообщения пользователя
-    - user_id: ID пользователя для подгрузки контекста
-    - db: AsyncSession для работы с БД
-    - history: история переписки (SupportChat)
+    Автоматически выставляет 'handover': True, если нужно подключить человека.
     """
 
     if not settings.GROK_API_URL:
@@ -37,7 +32,7 @@ async def call_grok_model(
         logger.exception(f"Ошибка при чтении системного prompt: {e}")
         raise RuntimeError(f"Ошибка при чтении системного prompt: {e}")
 
-    # Получаем контекст пользователя из БД, если передан user_id и db
+    # Подгружаем контекст пользователя
     user_context = {}
     if user_id and db:
         try:
@@ -51,14 +46,12 @@ async def call_grok_model(
         {"role": "system", "content": f"USER_CONTEXT: {user_context}"}
     ]
 
-    # Добавляем историю переписки
     if history:
         for msg in history:
             role = "user" if msg.sender == SenderType.user else "assistant"
             messages_payload.append({"role": role, "content": msg.message})
         logger.debug(f"Добавлено {len(history)} сообщений из истории для user_id={user_id}")
 
-    # Добавляем текущее сообщение пользователя
     messages_payload.append({"role": "user", "content": message})
 
     payload = {
@@ -67,10 +60,8 @@ async def call_grok_model(
         "messages": messages_payload
     }
 
-    # Логируем полный payload красиво
     logger.info(f"Payload для Grok (user_id={user_id}):\n{json.dumps(payload, indent=2, ensure_ascii=False)}")
 
-    # Если режим отладки — возвращаем payload и не делаем запрос
     if debug_return_payload:
         logger.info("DEBUG: возвращаем payload без запроса к Grok")
         return payload
@@ -85,8 +76,18 @@ async def call_grok_model(
         try:
             resp = await client.post(settings.GROK_API_URL, json=payload, headers=headers)
             resp.raise_for_status()
-            result =  resp.json()
+            result = resp.json()
             logger.debug(f"Ответ от Grok для user_id={user_id}: {result}")
+
+            # --- Автоматическая логика handover ---
+            user_request_for_human = any(
+                kw in message.lower() for kw in ["человек", "оператор", "живой агент", "поговорить с человеком"]
+            )
+            if user_request_for_human:
+                logger.info(f"user_id={user_id} запросил живого оператора — выставляем handover=True")
+                result["handover"] = True
+                result["reply"] = "Подключаю модератора к чату, пожалуйста, ожидайте несколько секунд."
+
             return result
         except httpx.HTTPStatusError as e:
             logger.exception(f"HTTP ошибка при вызове Grok для user_id={user_id}: {e}")
